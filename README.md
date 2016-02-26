@@ -1,7 +1,7 @@
 # Installation
 
 `npm install`
-`npm compile`
+`npm run-script compile`
 
 # Running
 Start an http server in the root directory.
