@@ -13,6 +13,7 @@ const BoundingBoxT = React.PropTypes.arrayOf(React.PropTypes.number);
 const SeekControl = React.createClass({
     propTypes: {
         keyFrameData: React.PropTypes.arrayOf(BoundingBoxT),
+        modifyKeyFrameTime: React.PropTypes.func,
         modifyTime: React.PropTypes.func,
         pauseCallback: React.PropTypes.func.isRequired,
         playing: React.PropTypes.bool.isRequired,
@@ -25,14 +26,18 @@ const SeekControl = React.createClass({
         };
     },
 
-    onDrag: function(event) {
-        let xInLocalCoords = event.clientX - controlHeightPx - 1;
+    xToTime: function(clientX) {
+        let xInLocalCoords = clientX - controlHeightPx - 1;
         if (xInLocalCoords > seekWidthPx) {
             xInLocalCoords = seekWidthPx;
         } else if (xInLocalCoords < 0) {
             xInLocalCoords = 0;
         }
-        const time = xInLocalCoords / seekWidthPx * this.props.videoDuration;
+        return xInLocalCoords / seekWidthPx * this.props.videoDuration;
+    },
+
+    onDrag: function(event) {
+        const time = this.xToTime(event.clientX);
         this.props.modifyTime(time);
         return time;
     },
@@ -43,6 +48,31 @@ const SeekControl = React.createClass({
         // something about drag events of setting the time in a video.
         const time = this.onDrag(event);
         this.props.modifyTime(time);
+    },
+
+    keyFrameControlDown: function(idx, event) {
+        const control = this.refs[`keyframe${idx}`];
+        const initialClientX = event.clientX;
+        const initialPos = control.getBoundingClientRect().left;
+        const xToTime = this.xToTime;
+        this.listener = (event) => {
+            if (this.props.videoDuration) {
+                const newTime = xToTime(
+                    event.clientX - initialClientX + initialPos);
+                this.props.modifyKeyFrameTime(idx, newTime);
+            }
+        };
+        control.addEventListener(
+            "mousemove",
+            this.listener);
+    },
+
+    keyFrameControlUp: function(idx, event) {
+        const control = this.refs[`keyframe${idx}`];
+        control.removeEventListener("mousemove", this.listener);
+        delete this.initialClientX;
+        delete this.initalPos;
+        delete this.listener;
     },
 
     render: function() {
@@ -56,6 +86,10 @@ const SeekControl = React.createClass({
             return <div
                 className={css(styles.keyFrameControl)}
                 key={i}
+                ref={`keyframe${i}`}
+                onMouseDown={(event) => this.keyFrameControlDown(i, event)}
+                onMouseLeave={(event) => this.keyFrameControlUp(i, event)}
+                onMouseUp={(event) => this.keyFrameControlUp(i, event)}
                 style={{left: kf[0] * seekWidthPx - 5}}
             />;
         });
@@ -76,6 +110,7 @@ const SeekControl = React.createClass({
 const ControlBar = React.createClass({
     propTypes: {
         keyFrameData: React.PropTypes.arrayOf(BoundingBoxT),
+        modifyKeyFrameTime: React.PropTypes.func,
         modifyTime: React.PropTypes.func,
         playing: React.PropTypes.bool,
         setPlayingState: React.PropTypes.func,
@@ -106,6 +141,7 @@ const ControlBar = React.createClass({
             </div>
             <SeekControl
                 keyFrameData={this.props.keyFrameData}
+                modifyKeyFrameTime={this.props.modifyKeyFrameTime}
                 modifyTime={this.props.modifyTime}
                 pauseCallback={this.pause}
                 playing={this.props.playing}
@@ -234,6 +270,12 @@ const Page = React.createClass({
         newFrameData[boxIndex] = newBox;
         this.setState({frameData: newFrameData});
     },
+    modifyKeyFrameTime: function(keyFrameIndex, newTime) {
+        const newFrameData = [...this.state.frameData];
+        newFrameData[keyFrameIndex] = [...newFrameData[keyFrameIndex]];
+        newFrameData[keyFrameIndex][0] = newTime / this.refs.video.duration;
+        this.setState({frameData: newFrameData});
+    },
     modifyTime: function(newTime) {
         this.setState({time: newTime});
         this.refs.video.currentTime = newTime;
@@ -251,6 +293,7 @@ const Page = React.createClass({
             <ControlBar
                 keyFrameData={this.state.frameData}
                 modifyTime={this.modifyTime}
+                modifyKeyFrameTime={this.modifyKeyFrameTime}
                 playing={this.state.playing}
                 setPlayingState={this.setPlaying}
                 time={this.state.time}
@@ -293,6 +336,9 @@ const styles = StyleSheet.create({
         height: 10,
         position: "absolute",
         width: 10,
+        ':hover': {
+            cursor: "pointer",
+        },
     },
     playControl: {
         alignItems: "center",
