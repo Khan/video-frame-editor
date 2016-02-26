@@ -38,6 +38,9 @@ const SeekControl = React.createClass({
     },
 
     onDragEnd: function(event) {
+        // TODO(colin): this appears not to work correctly unless I call
+        // modifyTime this second time, which probably means I don't understand
+        // something about drag events of setting the time in a video.
         const time = this.onDrag(event);
         this.props.modifyTime(time);
     },
@@ -116,6 +119,7 @@ const ControlBar = React.createClass({
 const BoundingBox = React.createClass({
     propTypes: {
         data: React.PropTypes.arrayOf(BoundingBoxT),
+        modifyBox: React.PropTypes.func,
         time: React.PropTypes.number,
         videoDuration: React.PropTypes.number,
     },
@@ -128,7 +132,6 @@ const BoundingBox = React.createClass({
     componentWillUnmount: function() {
         window.clearInterval(this.intervalID);
     },
-
     boundingBoxDraw: function() {
         if (this.props.videoDuration) {
             const time = this.props.time / this.props.videoDuration;
@@ -139,7 +142,29 @@ const BoundingBox = React.createClass({
             }
         }
     },
-
+    onMouseDown: function(event) {
+        this.dragStartX = event.screenX;
+        this.dragStartY = event.screenY;
+        this.originalBoxPos = this.props.data[this.state.currentBoxIndex];
+        this.refs.box.addEventListener("mousemove", this.onDrag);
+    },
+    onMouseUp: function(event) {
+        delete this.dragStartX;
+        delete this.dragStartY;
+        delete this.originalBoxPos;
+        this.refs.box.removeEventListener("mousemove", this.onDrag);
+    },
+    onDrag: function(event) {
+        const data = this.originalBoxPos;
+        const x = event.screenX - this.dragStartX + data[1];
+        const y = event.screenY - this.dragStartY + data[2];
+        const width = data[3] - data[1];
+        const height = data[4] - data[2];
+        const newBox = [data[0], x, y, x + width, y + height];
+        this.props.modifyBox(
+            this.state.currentBoxIndex,
+            newBox);
+    },
     render: function() {
         const data = this.props.data[this.state.currentBoxIndex];
         const pos = {
@@ -148,7 +173,13 @@ const BoundingBox = React.createClass({
             width: data[3] - data[1],
             height: data[4] - data[2],
         };
-        return <div className={css(styles.boundingBox)} style={pos} />;
+        return <div
+            className={css(styles.boundingBox)}
+            onMouseUp={this.onMouseUp}
+            onMouseDown={this.onMouseDown}
+            ref="box"
+            style={pos}
+        />;
 
     },
 });
@@ -198,6 +229,11 @@ const Page = React.createClass({
             this.refs.video.pause();
         }
     },
+    modifyBox: function(boxIndex, newBox) {
+        const newFrameData = [...this.state.frameData];
+        newFrameData[boxIndex] = newBox;
+        this.setState({frameData: newFrameData});
+    },
     modifyTime: function(newTime) {
         this.setState({time: newTime});
         this.refs.video.currentTime = newTime;
@@ -208,6 +244,7 @@ const Page = React.createClass({
             </video>
             <BoundingBox
                 data={this.state.frameData}
+                modifyBox={this.modifyBox}
                 time={this.state.time}
                 videoDuration={(this.refs.video || {}).duration}
             />
@@ -234,6 +271,9 @@ const styles = StyleSheet.create({
     boundingBox: {
         border: "2px solid white",
         position: "absolute",
+        ':hover': {
+            cursor: "pointer",
+        },
     },
     controlBar: {
         alignItems: "center",
