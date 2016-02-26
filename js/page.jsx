@@ -6,9 +6,16 @@ const FrameData = require("./data.js");
 const controlHeightPx = 50;
 const scrubberWidthPx = 10;
 const seekWidthPx = 800;
+const defaultRegionSizePx = 400;
 
 // A bounding box is: [time, left, top, right, bottom]
 const BoundingBoxT = React.PropTypes.arrayOf(React.PropTypes.number);
+
+const findKeyFrameIndex = function(frameData, fractionalTime) {
+    let frame = frameData.findIndex((elt) => elt[0] >= fractionalTime) - 1;
+    if (!frame || frame < 0) {frame = 0;}
+    return frame;
+};
 
 const SeekControl = React.createClass({
     propTypes: {
@@ -109,6 +116,8 @@ const SeekControl = React.createClass({
 
 const ControlBar = React.createClass({
     propTypes: {
+        addKeyFrame: React.PropTypes.func.isRequired,
+        deleteKeyFrame: React.PropTypes.func.isRequired,
         keyFrameData: React.PropTypes.arrayOf(BoundingBoxT),
         modifyKeyFrameTime: React.PropTypes.func,
         modifyTime: React.PropTypes.func,
@@ -116,6 +125,14 @@ const ControlBar = React.createClass({
         setPlayingState: React.PropTypes.func,
         time: React.PropTypes.number,
         videoDuration: React.PropTypes.number,
+    },
+    addKeyFrame: function() {
+        this.props.addKeyFrame(
+            [this.props.time / this.props.videoDuration,
+                0, 0, defaultRegionSizePx, defaultRegionSizePx]);
+    },
+    deleteKeyFrame: function() {
+        this.props.deleteKeyFrame(this.props.time / this.props.videoDuration);
     },
     playPause: function() {
         if (this.props.playing) {
@@ -148,6 +165,18 @@ const ControlBar = React.createClass({
                 time={this.props.time}
                 videoDuration={this.props.videoDuration}
             />
+            <div
+                className={css(styles.addKeyFrameControl)}
+                onClick={this.addKeyFrame}
+            >
+                <i className="material-icons">add</i>
+            </div>
+            <div
+                className={css(styles.deleteKeyFrameControl)}
+                onClick={this.deleteKeyFrame}
+            >
+                <i className="material-icons">remove</i>
+            </div>
         </div>;
     },
 });
@@ -171,8 +200,7 @@ const BoundingBox = React.createClass({
     boundingBoxDraw: function() {
         if (this.props.videoDuration) {
             const time = this.props.time / this.props.videoDuration;
-            let frame = this.props.data.findIndex((elt) => elt[0] >= time) - 1;
-            if (!frame || frame < 0) {frame = 0;}
+            const frame = findKeyFrameIndex(this.props.data, time);
             if (this.state.currentBoxIndex !== frame) {
                 this.setState({currentBoxIndex: frame});
             }
@@ -246,10 +274,26 @@ const Page = React.createClass({
     activateInterval: function() {
         this.intervalID = window.setInterval(this.checkVideoProgress, 200);
     },
+    addKeyFrame: function(newFrame) {
+        const newFrameData = [newFrame, ...this.state.frameData];
+        newFrameData.sort((frame0, frame1) => frame0[0] - frame1[0]);
+        this.setState({frameData: newFrameData});
+    },
     deactivateInterval: function() {
         if (this.intervalID) {
             window.clearInterval(this.intervalID);
             this.intervalID = null;
+        }
+    },
+    deleteKeyFrame: function(fractionalTime) {
+        const frame = findKeyFrameIndex(this.state.frameData, fractionalTime);
+        if (frame > 0 && frame < this.state.frameData.length - 1) {
+            const newFrameData = [
+                ...this.state.frameData.slice(0, frame),
+                ...this.state.frameData.slice(
+                    frame + 1, this.state.frameData.length)];
+            newFrameData.sort((frame0, frame1) => frame0[0] - frame1[0]);
+            this.setState({frameData: newFrameData});
         }
     },
     checkVideoProgress: function() {
@@ -274,6 +318,7 @@ const Page = React.createClass({
         const newFrameData = [...this.state.frameData];
         newFrameData[keyFrameIndex] = [...newFrameData[keyFrameIndex]];
         newFrameData[keyFrameIndex][0] = newTime / this.refs.video.duration;
+        newFrameData.sort((frame0, frame1) => frame0[0] - frame1[0]);
         this.setState({frameData: newFrameData});
     },
     modifyTime: function(newTime) {
@@ -282,7 +327,12 @@ const Page = React.createClass({
     },
     render: function() {
         return <div className={css(styles.playerContainer)}>
-            <video id="video" ref="video" src="video/AqMT_zB9rP8.mp4">
+            <video
+                id="video"
+                preload={true}
+                ref="video"
+                src="video/AqMT_zB9rP8.mp4"
+            >
             </video>
             <BoundingBox
                 data={this.state.frameData}
@@ -291,6 +341,8 @@ const Page = React.createClass({
                 videoDuration={(this.refs.video || {}).duration}
             />
             <ControlBar
+                addKeyFrame={this.addKeyFrame}
+                deleteKeyFrame={this.deleteKeyFrame}
                 keyFrameData={this.state.frameData}
                 modifyTime={this.modifyTime}
                 modifyKeyFrameTime={this.modifyKeyFrameTime}
@@ -310,7 +362,27 @@ const colors = {
     kaGreen: "#639b24",
 };
 
+const button = {
+    alignItems: "center",
+    display: "flex",
+    height: controlHeightPx,
+    justifyContent: "center",
+    width: controlHeightPx,
+    ':active': {
+        backgroundColor: colors.defaultTopicColor,
+    },
+    ':hover': {
+        cursor: "pointer",
+    },
+};
+
 const styles = StyleSheet.create({
+    addKeyFrameControl: {
+        borderLeft: "1px solid black",
+        marginLeft: scrubberWidthPx / 2,
+        borderRight: "1px solid black",
+        ...button,
+    },
     boundingBox: {
         border: "2px solid white",
         position: "absolute",
@@ -329,6 +401,10 @@ const styles = StyleSheet.create({
         position: "absolute",
         width: "100%",
     },
+    deleteKeyFrameControl: {
+        borderRight: "1px solid black",
+        ...button,
+    },
     keyFrameControl: {
         backgroundColor: colors.kaGreen,
         bottom: 0,
@@ -341,19 +417,9 @@ const styles = StyleSheet.create({
         },
     },
     playControl: {
-        alignItems: "center",
         borderRight: "1px solid black",
-        display: "flex",
-        height: controlHeightPx,
-        justifyContent: "center",
         marginRight: scrubberWidthPx / 2,
-        width: controlHeightPx,
-        ':active': {
-            backgroundColor: colors.defaultTopicColor,
-        },
-        ':hover': {
-            cursor: "pointer",
-        },
+        ...button,
     },
     playerContainer: {
         left: 0,
@@ -371,10 +437,8 @@ const styles = StyleSheet.create({
         },
     },
     seeker: {
-        borderRight: "1px solid black",
         boxSizing: "border-box",
         height: controlHeightPx,
-        paddingRight: scrubberWidthPx / 2,
         position: "relative",
         width: seekWidthPx,
     },
