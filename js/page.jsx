@@ -8,7 +8,6 @@ const videoHeightPx = 576;
 const controlHeightPx = 50;
 const scrubberWidthPx = 8;
 const seekWidthPx = 874;
-const defaultRegionSizePx = 400;
 
 // A bounding box is: [time, left, top, right, bottom]
 const BoundingBoxT = React.PropTypes.arrayOf(React.PropTypes.number);
@@ -102,9 +101,17 @@ const ControlBar = React.createClass({
         videoDuration: React.PropTypes.number,
     },
     addKeyFrame: function() {
-        this.props.addKeyFrame(
-            [this.props.time / this.props.videoDuration,
-                0, 0, defaultRegionSizePx, defaultRegionSizePx]);
+      // We want to drop in a keyframe at the same position as the current keyframe - that'll help avoid jumpy data.
+      const currentKeyframeIndex = findKeyFrameIndex(this.props.keyFrameData, this.props.time)
+      const currentKeyFrame = this.props.keyFrameData[currentKeyframeIndex]
+      const newKeyframe = [
+        (this.props.time / this.props.videoDuration) - 0.0001, // this helps make the keyframe "the current keyframe" without noticable issue
+        currentKeyFrame[1],
+        currentKeyFrame[2],
+        currentKeyFrame[3],
+        currentKeyFrame[4]
+      ]
+        this.props.addKeyFrame(newKeyframe);
     },
     deleteKeyFrame: function() {
         this.props.deleteKeyFrame(this.props.time / this.props.videoDuration);
