@@ -165,7 +165,7 @@ const NavBar = React.createClass({
   render: function() {
 
     const allVideoIDsAsOptions = this.props.videoIDs.map(videoID => {
-      return <option value={videoID}>{videoID}</option>
+      return <option key={videoID} value={videoID}>{videoID}</option>
     })
 
 
