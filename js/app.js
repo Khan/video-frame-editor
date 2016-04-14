@@ -33,9 +33,13 @@ const App = React.createClass({
     })
   },
   onSave(data) {
+    // HACK: Filter out nulls
+    const dataWithoutNulls = data.filter(item => {
+      return (item[0] != null)
+    })
     fetch('/data/' + this.state.currentVideoID, {
       method: "POST",
-      body: JSON.stringify(data),
+      body: JSON.stringify(dataWithoutNulls),
       headers: {'Content-Type': 'application/json'}
     })
     this.setState({

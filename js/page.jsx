@@ -346,6 +346,8 @@ const Page = React.createClass({
           data[3] * fullWidthPx,
           data[4] * videoHeightPx
         ]
+      }).filter (item => {
+        return (item[0] != null) // HACK: filter out null data
       })
     },
     normalizeFrameData(frameData) {
@@ -357,6 +359,8 @@ const Page = React.createClass({
           data[3] / fullWidthPx,
           data[4] / videoHeightPx
         ]
+      }).filter (item => {
+        return (item[0] != null) // HACK: filter out null data
       })
     },
     componentDidMount: function() {
