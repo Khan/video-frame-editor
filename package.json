@@ -5,6 +5,7 @@
   "author": "Colin Fuller <colin@khanacademy.org",
   "dependencies": {
     "aphrodite": "^0.1.2",
+    "express": "^4.13.4",
     "react": "^0.14.7",
     "react-dom": "^0.14.7"
   },

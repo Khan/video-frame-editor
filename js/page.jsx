@@ -44,43 +44,10 @@ const SeekControl = React.createClass({
         return xInLocalCoords / seekWidthPx * this.props.videoDuration;
     },
 
-    onDrag: function(event) {
-        const time = this.xToTime(event.clientX);
+    onDrag: function(dx, dy, x, y) {
+        const time = this.xToTime(x);
         this.props.modifyTime(time);
         return time;
-    },
-
-    onDragEnd: function(event) {
-        // TODO(colin): this appears not to work correctly unless I call
-        // modifyTime this second time, which probably means I don't understand
-        // something about drag events of setting the time in a video.
-        const time = this.onDrag(event);
-        this.props.modifyTime(time);
-    },
-
-    keyFrameControlDown: function(idx, event) {
-        const control = this.refs[`keyframe${idx}`];
-        const initialClientX = event.clientX;
-        const initialPos = control.getBoundingClientRect().left;
-        const xToTime = this.xToTime;
-        this.listener = (event) => {
-            if (this.props.videoDuration) {
-                const newTime = xToTime(
-                    event.clientX - initialClientX + initialPos);
-                this.props.modifyKeyFrameTime(idx, newTime);
-            }
-        };
-        control.addEventListener(
-            "mousemove",
-            this.listener);
-    },
-
-    keyFrameControlUp: function(idx, event) {
-        const control = this.refs[`keyframe${idx}`];
-        control.removeEventListener("mousemove", this.listener);
-        delete this.initialClientX;
-        delete this.initalPos;
-        delete this.listener;
     },
 
     render: function() {
@@ -90,24 +57,30 @@ const SeekControl = React.createClass({
                 this.props.time / this.props.videoDuration * seekWidthPx -
                 scrubberWidthPx / 2);
         }
+        let rightBefore = 0;
+
+        this.props.keyFrameData.forEach((kf, i) => {
+          if (kf[0] < (this.props.time / this.props.videoDuration)) {
+            rightBefore = i;
+          }
+        })
+
         const keyFrameControls = this.props.keyFrameData.map((kf, i) => {
-            return <div
-                className={css(styles.keyFrameControl)}
+            return <Draggable
+                className={css(styles.keyFrameControl, i === rightBefore && styles.keyFrameControlHighlighted)}
                 key={i}
-                ref={`keyframe${i}`}
-                onMouseDown={(event) => this.keyFrameControlDown(i, event)}
-                onMouseLeave={(event) => this.keyFrameControlUp(i, event)}
-                onMouseUp={(event) => this.keyFrameControlUp(i, event)}
+                onDragChange={(dx, dy, x, y) => {
+                  const newTime = this.xToTime(x);
+                  this.props.modifyKeyFrameTime(i, newTime);
+                }}
                 style={{left: kf[0] * seekWidthPx - 5}}
             />;
         });
         return <div className={css(styles.seeker)}>
-            <div
+            <Draggable
                 className={css(styles.scrubber)}
-                draggable={true}
-                onDrag={this.onDrag}
+                onDragChange={this.onDrag}
                 onDragStart={this.props.pauseCallback}
-                onDragEnd={this.onDragEnd}
                 style={{left: scrubberPosition}}
             />
             {keyFrameControls}
@@ -189,19 +162,34 @@ const NavBar = React.createClass({
     onSaveChanges: React.PropTypes.func,
   },
   render: function() {
+
+    const allVideoIDsAsOptions = this.props.videoIDs.map(videoID => {
+      return <option value={videoID}>{videoID}</option>
+    })
+
+
     return <div className={css(styles.navBar)}>
       <div className={css(styles.navBarGroup)}>
         <div className={css(styles.navBarTitle)}>Choose Video:</div>
-        <select className={css(styles.navBarSelect)}>
-          <option value="">Choose Video TBD</option>
+        <select
+          className={css(styles.navBarSelect)}
+          onChange={evt => this.props.onVideoChange(evt.target.value)}
+          value={this.props.currentVideoID}>
+            {allVideoIDsAsOptions}
         </select>
       </div>
       <div className={css(styles.navBarGroup)}>
-        <button className={css(styles.navBarCancelButton)}>
-          Discard Changes
+        <button
+          className={css(styles.navBarCancelButton)}
+          onClick={this.props.onDiscardChanges}
+          >
+            Discard Changes
         </button>
-        <button className={css(styles.navBarSaveButton)}>
-          Save Changes
+        <button
+          className={css(styles.navBarSaveButton)}
+          onClick={this.props.onSaveChanges}
+          >
+            Save Changes
         </button>
       </div>
     </div>
@@ -210,7 +198,9 @@ const NavBar = React.createClass({
 
 const Draggable = React.createClass({
     propTypes: {
-      onDragChange: React.PropTypes.func,
+      onDragChange: React.PropTypes.func.isRequired,
+      onDragStart: React.PropTypes.func,
+      style: React.PropTypes.object,
     },
     getInitialState() {
       return {startX: null, startY: null}
@@ -222,11 +212,14 @@ const Draggable = React.createClass({
       })
       window.addEventListener("mousemove", this.onMouseMove)
       window.addEventListener("mouseup", this.onMouseUp)
+      if (this.props.onDragStart) {
+        this.props.onDragStart()
+      }
     },
     onMouseMove(event) {
       const deltaX = event.screenX - this.state.startX;
       const deltaY = event.screenY - this.state.startY;
-      this.props.onDragChange(deltaX, deltaY);
+      this.props.onDragChange(deltaX, deltaY, event.screenX, event.screenY);
       this.setState({
         startX: event.screenX,
         startY: event.screenY,
@@ -241,7 +234,11 @@ const Draggable = React.createClass({
       window.removeEventListener("mouseup", this.onMouseUp)
     },
     render() {
-      return <div onMouseDown={this.onMouseDown} className={this.props.className}>
+      return <div
+        onMouseDown={this.onMouseDown}
+        className={this.props.className}
+        style={this.props.style}
+      >
           {this.props.children}
       </div>
     }
@@ -318,9 +315,16 @@ const BoundingBox = React.createClass({
 });
 
 const Page = React.createClass({
+    propTypes: {
+      currentVideoID: React.PropTypes.string.isRequired,
+      initialFrameData: React.PropTypes.arrayOf(React.PropTypes.arrayOf(React.PropTypes.number)),
+      onSave: React.PropTypes.func,
+      videoIDs: React.PropTypes.arrayOf(React.PropTypes.string),
+      setCurrentVideo: React.PropTypes.func,
+    },
     getInitialState: function() {
         return {
-            frameData: FrameData,
+            frameData: this.props.initialFrameData,
             playing: false,
             time: 0,
         };
@@ -396,13 +400,19 @@ const Page = React.createClass({
     },
     render: function() {
         return <div className={css(styles.playerContainer)}>
-          <NavBar />
+          <NavBar
+            videoIDs={this.props.videoIDs}
+            currentVideoID={this.props.currentVideoID}
+            onVideoChange={this.props.setCurrentVideo}
+            onDiscardChanges={this.onDiscardChanges}
+            onSaveChanges={this.onSaveChanges}
+            />
           <div className={css(styles.videoContainer)}>
             <video className={css(styles.videoPlayer)}
               id="video"
               preload={true}
               ref="video"
-              src="video/AqMT_zB9rP8.mp4"
+              src={"video/" + this.props.currentVideoID + ".mp4"}
             />
             <BoundingBox
               data={this.state.frameData}
@@ -432,6 +442,7 @@ const colors = {
     primaryControl: "#78C008", // green
     secondaryControl: "#2D5B66", // dark blue
     tertiaryControl: "#5AB5CC", // light blue
+    quaternaryControl: "#D6DEBA", // gold
     darkGray: "#595959",
 };
 
@@ -503,6 +514,9 @@ const styles = StyleSheet.create({
             cursor: "pointer",
         },
     },
+    keyFrameControlHighlighted: {
+      backgroundColor: colors.whiteColor,
+    },
     navBar: {
       left: 0,
       top: 0,
@@ -551,7 +565,7 @@ const styles = StyleSheet.create({
         width: fullWidthPx,
     },
     scrubber: {
-        backgroundColor: colors.tertiaryControl,
+        backgroundColor: colors.quaternaryControl,
         height: controlHeightPx,
         position: "absolute",
         top: 0,
