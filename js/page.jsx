@@ -287,7 +287,7 @@ const BoundingBox = React.createClass({
     onResizeDrag(deltaX, deltaY) {
       const data = this.props.data[this.state.currentBoxIndex];
       const width = Math.min(Math.max(data[3] - data[1] + deltaX, 40), fullWidthPx - data[1]);
-      const height = Math.min(Math.max(data[4] - data[2] + deltaY, 40), videoHeightPx - data[2] - controlHeightPx);
+      const height = Math.min(Math.max(data[4] - data[2] + deltaY, 40), videoHeightPx - data[2]);
       const newBox = [data[0], data[1], data[2], data[1] + width, data[2] + height];
       this.props.modifyBox(
         this.state.currentBoxIndex,
@@ -529,7 +529,7 @@ const styles = StyleSheet.create({
     controlBar: {
         alignItems: "center",
         backgroundColor: colors.darkGray,
-        bottom: 0,
+        bottom: -controlHeightPx,
         display: "flex",
         height: controlHeightPx,
         justifyContent: "flex-start",
@@ -601,6 +601,7 @@ const styles = StyleSheet.create({
         position: "absolute",
         top: 0,
         width: fullWidthPx,
+        height: controlHeightPx + videoHeightPx,
     },
     scrubber: {
         backgroundColor: colors.quaternaryControl,
