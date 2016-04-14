@@ -102,16 +102,14 @@ const ControlBar = React.createClass({
     },
     addKeyFrame: function() {
       // We want to drop in a keyframe at the same position as the current keyframe - that'll help avoid jumpy data.
-      const currentKeyframeIndex = findKeyFrameIndex(this.props.keyFrameData, this.props.time)
-      const currentKeyFrame = this.props.keyFrameData[currentKeyframeIndex]
-      const newKeyframe = [
+      var currentKeyFrame = this.props.keyFrameData[findKeyFrameIndex(this.props.keyFrameData, this.props.time / this.props.videoDuration)]
+      this.props.addKeyFrame([
         (this.props.time / this.props.videoDuration) - 0.0001, // this helps make the keyframe "the current keyframe" without noticable issue
         currentKeyFrame[1],
         currentKeyFrame[2],
         currentKeyFrame[3],
         currentKeyFrame[4]
-      ]
-        this.props.addKeyFrame(newKeyframe);
+      ]);
     },
     deleteKeyFrame: function() {
         this.props.deleteKeyFrame(this.props.time / this.props.videoDuration);
