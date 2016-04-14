@@ -289,7 +289,7 @@ const BoundingBox = React.createClass({
     onResizeDrag(deltaX, deltaY) {
       const data = this.props.data[this.state.currentBoxIndex];
       const width = Math.min(Math.max(data[3] - data[1] + deltaX, 40), fullWidthPx - data[1]);
-      const height = Math.min(Math.max(data[4] - data[2] + deltaY, 40), videoHeightPx - data[2]);
+      const height = Math.min(Math.max(data[4] - data[2] + deltaY, 40), videoHeightPx - data[2] - controlHeightPx);
       const newBox = [data[0], data[1], data[2], data[1] + width, data[2] + height];
       this.props.modifyBox(
         this.state.currentBoxIndex,
