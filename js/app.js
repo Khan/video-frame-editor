@@ -32,6 +32,19 @@ const App = React.createClass({
       })
     })
   },
+  onSave(data) {
+    fetch('/data/' + this.state.currentVideoID, {
+      method: "POST",
+      body: JSON.stringify(data),
+      headers: {'Content-Type': 'application/json'}
+    })
+    this.setState({
+      videoData: {
+        ...this.state.videoData,
+        [this.state.currentVideoID]: data,
+      }
+    })
+  },
   render() {
     if (this.state.loading) {
       return <div>Loading</div>

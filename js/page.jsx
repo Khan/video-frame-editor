@@ -4,6 +4,7 @@ const {StyleSheet, css} = require("aphrodite");
 const FrameData = require("./data.js");
 
 const fullWidthPx = 1024;
+const videoHeightPx = 576;
 const controlHeightPx = 50;
 const scrubberWidthPx = 8;
 const seekWidthPx = 874;
@@ -324,10 +325,32 @@ const Page = React.createClass({
     },
     getInitialState: function() {
         return {
-            frameData: this.props.initialFrameData,
+            frameData: this.denormalizeFrameData(this.props.initialFrameData),
             playing: false,
             time: 0,
         };
+    },
+    denormalizeFrameData(frameData) {
+      return frameData.map(data => {
+        return [
+          data[0],
+          data[1] * fullWidthPx,
+          data[2] * videoHeightPx,
+          data[3] * fullWidthPx,
+          data[4] * videoHeightPx
+        ]
+      })
+    },
+    normalizeFrameData(frameData) {
+      return frameData.map(data => {
+        return [
+          data[0],
+          data[1] / fullWidthPx,
+          data[2] / videoHeightPx,
+          data[3] / fullWidthPx,
+          data[4] / videoHeightPx
+        ]
+      })
     },
     componentDidMount: function() {
         if (this.state.playing) {
@@ -397,6 +420,12 @@ const Page = React.createClass({
     modifyTime: function(newTime) {
         this.setState({time: newTime});
         this.refs.video.currentTime = newTime;
+    },
+    onDiscardChanges() {
+      this.setState({frameData: this.denormalizeFrameData(this.props.initialFrameData)})
+    },
+    onSaveChanges() {
+      this.props.onSave(normalizeFrameData(this.state.frameData))
     },
     render: function() {
         return <div className={css(styles.playerContainer)}>
@@ -582,11 +611,11 @@ const styles = StyleSheet.create({
     },
     videoContainer: {
       width: "100%",
-      height: 576,
+      height: videoHeightPx,
     },
     videoPlayer: {
       width: "100%",
-      height: 576,
+      height: videoHeightPx,
     },
 });
 
