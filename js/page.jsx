@@ -3,9 +3,10 @@ const {StyleSheet, css} = require("aphrodite");
 
 const FrameData = require("./data.js");
 
+const fullWidthPx = 1024;
 const controlHeightPx = 50;
-const scrubberWidthPx = 10;
-const seekWidthPx = 800;
+const scrubberWidthPx = 8;
+const seekWidthPx = 874;
 const defaultRegionSizePx = 400;
 
 // A bounding box is: [time, left, top, right, bottom]
@@ -145,41 +146,106 @@ const ControlBar = React.createClass({
         this.props.setPlayingState(false);
     },
     render: function() {
-        return <div
-            className={css(styles.controlBar)}
-        >
+        return <div className={css(styles.controlBar)}>
             <div
                 className={css(styles.playControl)}
                 onClick={this.playPause}
             >
-                {this.props.playing ?
-                    <i className="material-icons">pause</i> :
-                    <i className="material-icons">play_arrow</i>}
+              {this.props.playing ?
+                <i className="material-icons">pause</i> :
+                <i className="material-icons">play_arrow</i>}
             </div>
             <SeekControl
-                keyFrameData={this.props.keyFrameData}
-                modifyKeyFrameTime={this.props.modifyKeyFrameTime}
-                modifyTime={this.props.modifyTime}
-                pauseCallback={this.pause}
-                playing={this.props.playing}
-                time={this.props.time}
-                videoDuration={this.props.videoDuration}
+              keyFrameData={this.props.keyFrameData}
+              modifyKeyFrameTime={this.props.modifyKeyFrameTime}
+              modifyTime={this.props.modifyTime}
+              pauseCallback={this.pause}
+              playing={this.props.playing}
+              time={this.props.time}
+              videoDuration={this.props.videoDuration}
             />
             <div
-                className={css(styles.addKeyFrameControl)}
-                onClick={this.addKeyFrame}
+              className={css(styles.deleteKeyFrameControl)}
+              onClick={this.deleteKeyFrame}
             >
-                <i className="material-icons">add</i>
+              <i className="material-icons">remove</i>
             </div>
             <div
-                className={css(styles.deleteKeyFrameControl)}
-                onClick={this.deleteKeyFrame}
+              className={css(styles.addKeyFrameControl)}
+              onClick={this.addKeyFrame}
             >
-                <i className="material-icons">remove</i>
+                <i className="material-icons">add</i>
             </div>
         </div>;
     },
 });
+
+const NavBar = React.createClass({
+  propTypes: {
+    videoIDs: React.PropTypes.arrayOf(React.PropTypes.string),
+    currentVideoID: React.PropTypes.string,
+    onVideoChange: React.PropTypes.func,
+    onDiscardChanges: React.PropTypes.func,
+    onSaveChanges: React.PropTypes.func,
+  },
+  render: function() {
+    return <div className={css(styles.navBar)}>
+      <div className={css(styles.navBarGroup)}>
+        <div className={css(styles.navBarTitle)}>Choose Video:</div>
+        <select className={css(styles.navBarSelect)}>
+          <option value="">Choose Video TBD</option>
+        </select>
+      </div>
+      <div className={css(styles.navBarGroup)}>
+        <button className={css(styles.navBarCancelButton)}>
+          Discard Changes
+        </button>
+        <button className={css(styles.navBarSaveButton)}>
+          Save Changes
+        </button>
+      </div>
+    </div>
+  }
+})
+
+const Draggable = React.createClass({
+    propTypes: {
+      onDragChange: React.PropTypes.func,
+    },
+    getInitialState() {
+      return {startX: null, startY: null}
+    },
+    onMouseDown(event) {
+      this.setState({
+        startX: event.screenX,
+        startY: event.screenY,
+      })
+      window.addEventListener("mousemove", this.onMouseMove)
+      window.addEventListener("mouseup", this.onMouseUp)
+    },
+    onMouseMove(event) {
+      const deltaX = event.screenX - this.state.startX;
+      const deltaY = event.screenY - this.state.startY;
+      this.props.onDragChange(deltaX, deltaY);
+      this.setState({
+        startX: event.screenX,
+        startY: event.screenY,
+      })
+    },
+    onMouseUp(event) {
+      this.setState({
+        startX: null,
+        startY: null,
+      })
+      window.removeEventListener("mousemove", this.onMouseMove)
+      window.removeEventListener("mouseup", this.onMouseUp)
+    },
+    render() {
+      return <div onMouseDown={this.onMouseDown} className={this.props.className}>
+          {this.props.children}
+      </div>
+    }
+})
 
 const BoundingBox = React.createClass({
     propTypes: {
@@ -206,44 +272,47 @@ const BoundingBox = React.createClass({
             }
         }
     },
-    onMouseDown: function(event) {
-        this.dragStartX = event.screenX;
-        this.dragStartY = event.screenY;
-        this.originalBoxPos = this.props.data[this.state.currentBoxIndex];
-        this.refs.box.addEventListener("mousemove", this.onDrag);
+    onDrag(deltaX, deltaY) {
+      const data = this.props.data[this.state.currentBoxIndex];
+      const x = Math.max(data[1] + deltaX, 0);
+      const y = Math.max(data[2] + deltaY, 0);
+      const newBox = [data[0], x, y, x + (data[3] - data[1]), y + (data[4] - data[2]) ];
+      this.props.modifyBox(
+          this.state.currentBoxIndex,
+          newBox);
     },
-    onMouseUp: function(event) {
-        delete this.dragStartX;
-        delete this.dragStartY;
-        delete this.originalBoxPos;
-        this.refs.box.removeEventListener("mousemove", this.onDrag);
-    },
-    onDrag: function(event) {
-        const data = this.originalBoxPos;
-        const x = event.screenX - this.dragStartX + data[1];
-        const y = event.screenY - this.dragStartY + data[2];
-        const width = data[3] - data[1];
-        const height = data[4] - data[2];
-        const newBox = [data[0], x, y, x + width, y + height];
-        this.props.modifyBox(
-            this.state.currentBoxIndex,
-            newBox);
+    onResizeDrag(deltaX, deltaY) {
+      const data = this.props.data[this.state.currentBoxIndex];
+      const width = Math.max(data[3] - data[1] + deltaX, 40);
+      const height = Math.max(data[4] - data[2] + deltaY, 40);
+      const newBox = [data[0], data[1], data[2], data[1] + width, data[2] + height];
+      this.props.modifyBox(
+        this.state.currentBoxIndex,
+        newBox);
     },
     render: function() {
         const data = this.props.data[this.state.currentBoxIndex];
         const pos = {
             left: data[1],
-            top: data[2],
+            top: Math.max(data[2]+controlHeightPx, controlHeightPx),
             width: data[3] - data[1],
             height: data[4] - data[2],
         };
         return <div
-            className={css(styles.boundingBox)}
-            onMouseUp={this.onMouseUp}
-            onMouseDown={this.onMouseDown}
-            ref="box"
-            style={pos}
-        />;
+          className={css(styles.boundingBox)}
+          ref="box"
+          style={pos}
+          >
+            <Draggable
+              onDragChange={this.onDrag}
+              className={css(styles.boundingBoxBackground)}
+            >
+            </Draggable>
+            <Draggable
+              onDragChange={this.onResizeDrag}
+              className={css(styles.boundingBoxResize)}>
+          </Draggable>
+          </div>;
 
     },
 });
@@ -327,39 +396,43 @@ const Page = React.createClass({
     },
     render: function() {
         return <div className={css(styles.playerContainer)}>
-            <video
-                id="video"
-                preload={true}
-                ref="video"
-                src="video/AqMT_zB9rP8.mp4"
-            >
-            </video>
+          <NavBar />
+          <div className={css(styles.videoContainer)}>
+            <video className={css(styles.videoPlayer)}
+              id="video"
+              preload={true}
+              ref="video"
+              src="video/AqMT_zB9rP8.mp4"
+            />
             <BoundingBox
-                data={this.state.frameData}
-                modifyBox={this.modifyBox}
-                time={this.state.time}
-                videoDuration={(this.refs.video || {}).duration}
+              data={this.state.frameData}
+              modifyBox={this.modifyBox}
+              time={this.state.time}
+              videoDuration={(this.refs.video || {}).duration}
             />
-            <ControlBar
-                addKeyFrame={this.addKeyFrame}
-                deleteKeyFrame={this.deleteKeyFrame}
-                keyFrameData={this.state.frameData}
-                modifyTime={this.modifyTime}
-                modifyKeyFrameTime={this.modifyKeyFrameTime}
-                playing={this.state.playing}
-                setPlayingState={this.setPlaying}
-                time={this.state.time}
-                videoDuration={(this.refs.video || {}).duration}
-            />
+          </div>
+          <ControlBar
+            addKeyFrame={this.addKeyFrame}
+            deleteKeyFrame={this.deleteKeyFrame}
+            keyFrameData={this.state.frameData}
+            modifyTime={this.modifyTime}
+            modifyKeyFrameTime={this.modifyKeyFrameTime}
+            playing={this.state.playing}
+            setPlayingState={this.setPlaying}
+            time={this.state.time}
+            videoDuration={(this.refs.video || {}).duration}
+          />
         </div>;
     },
 });
 
 const colors = {
-    defaultSubjectColor: "#4d6779",
-    defaultTopicColor: "#6a8da6",
-    kaBlue: "#314453",
-    kaGreen: "#639b24",
+    whiteColor: "#FFFFFF",
+    offWhiteColor: "#D9D9D9", // 85% white
+    primaryControl: "#78C008", // green
+    secondaryControl: "#2D5B66", // dark blue
+    tertiaryControl: "#5AB5CC", // light blue
+    darkGray: "#595959",
 };
 
 const button = {
@@ -368,9 +441,7 @@ const button = {
     height: controlHeightPx,
     justifyContent: "center",
     width: controlHeightPx,
-    ':active': {
-        backgroundColor: colors.defaultTopicColor,
-    },
+    backgroundColor: colors.tertiaryControl,
     ':hover': {
         cursor: "pointer",
     },
@@ -378,21 +449,37 @@ const button = {
 
 const styles = StyleSheet.create({
     addKeyFrameControl: {
-        borderLeft: "1px solid black",
-        marginLeft: scrubberWidthPx / 2,
-        borderRight: "1px solid black",
         ...button,
     },
     boundingBox: {
         border: "2px solid white",
         position: "absolute",
-        ':hover': {
-            cursor: "pointer",
-        },
+        display: "flex",
+    },
+    boundingBoxBackground: {
+      backgroundColor: "white",
+      opacity: "0.2",
+      height: "100%",
+      width: "100%",
+      ':hover': {
+          cursor: "pointer",
+      },
+    },
+    boundingBoxResize: {
+      width: 32,
+      height: 32,
+      backgroundColor: colors.whiteColor,
+      alignSelf: "flex-end",
+      position: "absolute",
+      bottom: 0,
+      right: 0,
+      ':hover': {
+          cursor: "pointer",
+      },
     },
     controlBar: {
         alignItems: "center",
-        backgroundColor: colors.defaultSubjectColor,
+        backgroundColor: colors.darkGray,
         bottom: 0,
         display: "flex",
         height: controlHeightPx,
@@ -402,32 +489,69 @@ const styles = StyleSheet.create({
         width: "100%",
     },
     deleteKeyFrameControl: {
-        borderRight: "1px solid black",
+      marginLeft: 10,
         ...button,
     },
     keyFrameControl: {
-        backgroundColor: colors.kaGreen,
+        backgroundColor: colors.primaryControl,
         bottom: 0,
-        color: colors.kaGreen,
-        height: 10,
+        color: colors.primaryControl,
+        height: 25,
         position: "absolute",
-        width: 10,
+        width: scrubberWidthPx,
         ':hover': {
             cursor: "pointer",
         },
     },
+    navBar: {
+      left: 0,
+      top: 0,
+      width: "100%",
+      height: controlHeightPx,
+      backgroundColor: colors.offWhiteColor,
+      display: "flex",
+      justifyContent: "space-between",
+    },
+    navBarGroup: {
+      display: "flex",
+      flexFlow: "row nowrap",
+      alignItems: "center",
+    },
+    navBarTitle: {
+      fontSize: 17,
+      fontFamily: ["sans-serif"],
+      color: colors.darkGray,
+      marginLeft: 8,
+    },
+    navBarSelect: {
+      marginLeft: 8,
+    },
+    navBarCancelButton: {
+      fontSize: 17,
+      fontFamily: ["sans-serif"],
+      color: colors.tertiaryControl,
+      marginRight: 8,
+    },
+    navBarSaveButton: {
+      fontSize: 17,
+      fontFamily: ["sans-serif"],
+      color: colors.whiteColor,
+      backgroundColor: colors.primaryControl,
+      marginRight: 8,
+      borderRadius: 4,
+    },
     playControl: {
-        borderRight: "1px solid black",
-        marginRight: scrubberWidthPx / 2,
+      marginRight: scrubberWidthPx,
         ...button,
     },
     playerContainer: {
         left: 0,
         position: "absolute",
         top: 0,
+        width: fullWidthPx,
     },
     scrubber: {
-        backgroundColor: colors.kaBlue,
+        backgroundColor: colors.tertiaryControl,
         height: controlHeightPx,
         position: "absolute",
         top: 0,
@@ -441,6 +565,14 @@ const styles = StyleSheet.create({
         height: controlHeightPx,
         position: "relative",
         width: seekWidthPx,
+    },
+    videoContainer: {
+      width: "100%",
+      height: 576,
+    },
+    videoPlayer: {
+      width: "100%",
+      height: 576,
     },
 });
 
