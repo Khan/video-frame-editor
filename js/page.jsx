@@ -409,7 +409,7 @@ const Page = React.createClass({
         }
     },
     clearKeyFrames: function() {
-      this.setState({frameData: [this.state.frameData[0]]})
+      this.setState({frameData: [this.state.frameData[0], this.state.frameData[this.state.frameData.length-1]]})
     },
     checkVideoProgress: function() {
         if (this.state.playing) {
