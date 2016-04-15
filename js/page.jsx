@@ -7,7 +7,7 @@ const fullWidthPx = 1024;
 const videoHeightPx = 576;
 const controlHeightPx = 50;
 const scrubberWidthPx = 8;
-const seekWidthPx = 874;
+const seekWidthPx = 824;
 
 // A bounding box is: [time, left, top, right, bottom]
 const BoundingBoxT = React.PropTypes.arrayOf(React.PropTypes.number);
@@ -91,6 +91,7 @@ const SeekControl = React.createClass({
 const ControlBar = React.createClass({
     propTypes: {
         addKeyFrame: React.PropTypes.func.isRequired,
+        clearKeyFrames: React.PropTypes.func.isRequired,
         deleteKeyFrame: React.PropTypes.func.isRequired,
         keyFrameData: React.PropTypes.arrayOf(BoundingBoxT),
         modifyKeyFrameTime: React.PropTypes.func,
@@ -154,6 +155,12 @@ const ControlBar = React.createClass({
               onClick={this.addKeyFrame}
             >
                 <i className="material-icons">add</i>
+            </div>
+            <div
+              className={css(styles.clearKeyFrameControl)}
+              onClick={this.props.clearKeyFrames}
+            >
+              <i className="material-icons">delete</i>
             </div>
         </div>;
     },
@@ -401,6 +408,9 @@ const Page = React.createClass({
             this.setState({frameData: newFrameData});
         }
     },
+    clearKeyFrames: function() {
+      this.setState({frameData: [this.state.frameData[0]]})
+    },
     checkVideoProgress: function() {
         if (this.state.playing) {
             this.setState({time: this.refs.video.currentTime});
@@ -461,6 +471,7 @@ const Page = React.createClass({
           </div>
           <ControlBar
             addKeyFrame={this.addKeyFrame}
+            clearKeyFrames={this.clearKeyFrames}
             deleteKeyFrame={this.deleteKeyFrame}
             keyFrameData={this.state.frameData}
             modifyTime={this.modifyTime}
@@ -481,6 +492,7 @@ const colors = {
     secondaryControl: "#2D5B66", // dark blue
     tertiaryControl: "#5AB5CC", // light blue
     quaternaryControl: "#D6DEBA", // gold
+    destructiveRed: "#D74642",
     darkGray: "#595959",
 };
 
@@ -490,7 +502,6 @@ const button = {
     height: controlHeightPx,
     justifyContent: "center",
     width: controlHeightPx,
-    backgroundColor: colors.tertiaryControl,
     ':hover': {
         cursor: "pointer",
     },
@@ -498,6 +509,7 @@ const button = {
 
 const styles = StyleSheet.create({
     addKeyFrameControl: {
+      backgroundColor: colors.tertiaryControl,
         ...button,
     },
     boundingBox: {
@@ -537,8 +549,14 @@ const styles = StyleSheet.create({
         position: "absolute",
         width: "100%",
     },
+    clearKeyFrameControl: {
+      color: colors.whiteColor,
+      backgroundColor: colors.destructiveRed,
+      ...button,
+    },
     deleteKeyFrameControl: {
       marginLeft: 10,
+      backgroundColor: colors.tertiaryControl,
         ...button,
     },
     keyFrameControl: {
@@ -593,6 +611,7 @@ const styles = StyleSheet.create({
       borderRadius: 4,
     },
     playControl: {
+      backgroundColor: colors.tertiaryControl,
       marginRight: scrubberWidthPx,
         ...button,
     },
